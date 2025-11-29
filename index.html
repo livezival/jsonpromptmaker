@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Prompt Maker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        /* Input Focus Ring Simulation for dynamic elements */
+        *:focus-visible {
+            outline: 2px solid #6366f1;
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body class="bg-[#0f111a] text-slate-100 font-sans selection:bg-indigo-500/30 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-[#161b22] border-b border-slate-800 sticky top-0 z-20 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600/10 p-2 rounded-lg border border-indigo-500/20">
+                    <i data-lucide="terminal" class="text-indigo-400 w-5 h-5"></i>
+                </div>
+                <h1 class="text-lg font-bold text-slate-200">JSON Prompt Maker</h1>
+            </div>
+            <button onclick="copyJson()" id="copyBtn" class="flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20">
+                <i data-lucide="copy" class="w-4 h-4 btn-icon"></i>
+                <span id="copyText">JSON Kopyala</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-8rem)]">
+            
+            <!-- LEFT PANEL: Editor -->
+            <div class="lg:col-span-7 flex flex-col gap-4 overflow-hidden h-full">
+                
+                <!-- Tab Menu -->
+                <div class="flex space-x-1 bg-slate-800/50 p-1 rounded-xl border border-slate-700/50 shrink-0 overflow-x-auto" id="tabContainer">
+                    <button onclick="switchTab('character')" class="tab-btn active flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-1 justify-center bg-indigo-600 text-white shadow-md" data-tab="character">
+                        <i data-lucide="user" class="w-4 h-4"></i>
+                        <span>Karakter</span>
+                    </button>
+                    <button onclick="switchTab('clothing')" class="tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-1 justify-center text-slate-400 hover:bg-slate-700/50 hover:text-slate-200" data-tab="clothing">
+                        <i data-lucide="shirt" class="w-4 h-4"></i>
+                        <span>Giyim</span>
+                    </button>
+                    <button onclick="switchTab('environment')" class="tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-1 justify-center text-slate-400 hover:bg-slate-700/50 hover:text-slate-200" data-tab="environment">
+                        <i data-lucide="map-pin" class="w-4 h-4"></i>
+                        <span>Ortam</span>
+                    </button>
+                    <button onclick="switchTab('tech')" class="tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-1 justify-center text-slate-400 hover:bg-slate-700/50 hover:text-slate-200" data-tab="tech">
+                        <i data-lucide="camera" class="w-4 h-4"></i>
+                        <span>Teknik & Stil</span>
+                    </button>
+                </div>
+
+                <!-- Form Area -->
+                <div id="formContainer" class="flex-1 overflow-y-auto pr-2 custom-scrollbar bg-slate-800/30 border border-slate-700/50 rounded-xl p-6 relative">
+                    <!-- Content will be injected here by JS -->
+                </div>
+            </div>
+
+            <!-- RIGHT PANEL: JSON Preview -->
+            <div class="lg:col-span-5 h-full overflow-hidden flex flex-col">
+                <div class="bg-[#0d1117] rounded-xl border border-slate-700 shadow-xl overflow-hidden flex flex-col h-full">
+                    <div class="bg-slate-800/80 px-4 py-3 border-b border-slate-700 flex justify-between items-center backdrop-blur-sm">
+                        <div class="flex items-center space-x-2">
+                            <div class="flex space-x-1.5 opacity-60">
+                                <div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                                <div class="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                                <div class="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                            </div>
+                            <span class="text-xs font-mono text-slate-400 ml-2">complex_prompt.json</span>
+                        </div>
+                        <div class="text-xs text-slate-500 font-mono" id="jsonSize">0 KB</div>
+                    </div>
+                    
+                    <div class="flex-1 overflow-auto p-4 font-mono text-xs md:text-sm custom-scrollbar relative bg-[#0d1117]">
+                        <pre id="jsonOutput" class="text-slate-300 leading-relaxed"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- Initial State (Empty Values for Placeholders) ---
+        let appData = {
+            prompt: {
+                subject: "",
+                age: "",
+                gender: "",
+                clothing: {
+                    top: "",
+                    bottom: "",
+                    general: ""
+                },
+                hair: "",
+                face: "",
+                glasses: {
+                    worn: false,
+                    description: "",
+                    details: {
+                        frame_shape: "",
+                        frame_material: "",
+                        frame_color: "",
+                        lens_type: "",
+                        style: ""
+                    }
+                },
+                accessories: [],
+                environment: {
+                    type: "indoor", // Default type
+                    // Common fields
+                    details: "",
+                    // Indoor fields
+                    room: "",
+                    furniture: "",
+                    indoor_objects: "",
+                    // Outdoor fields (initially empty)
+                    location: "",
+                    weather: "",
+                    landscape: ""
+                },
+                lighting: "",
+                camera: {
+                    perspective: "",
+                    angle: ""
+                },
+                style: [],
+                additional_details: ""
+            }
+        };
+
+        let activeTab = 'character';
+
+        // --- Core Functions ---
+
+        // Gets nested value from string path "prompt.clothing.top"
+        function getValue(path) {
+            return path.split('.').reduce((acc, part) => acc && acc[part], appData.prompt);
+        }
+
+        // Sets nested value
+        function setValue(path, value) {
+            const keys = path.split('.');
+            let current = appData.prompt;
+            for (let i = 0; i < keys.length - 1; i++) {
+                current = current[keys[i]];
+            }
+            current[keys[keys.length - 1]] = value;
+            renderJsonPreview();
+        }
+
+        // Input Change Handler
+        function handleInputChange(path, element) {
+            setValue(path, element.value);
+        }
+
+        // Toggle Glasses
+        function toggleGlasses() {
+            appData.prompt.glasses.worn = !appData.prompt.glasses.worn;
+            renderForm();
+            renderJsonPreview();
+        }
+        
+        // Toggle Environment Type
+        function setEnvironmentType(type) {
+            appData.prompt.environment.type = type;
+            renderForm();
+            renderJsonPreview();
+        }
+
+        // Array Operations
+        function addArrayItem(path) {
+            const keys = path.split('.');
+            let obj = appData.prompt;
+            for(let i=0; i<keys.length-1; i++) obj = obj[keys[i]];
+            obj[keys[keys.length-1]].push("");
+            
+            renderForm(); 
+            renderJsonPreview();
+        }
+
+        function removeArrayItem(path, index) {
+            const keys = path.split('.');
+            let obj = appData.prompt;
+            for(let i=0; i<keys.length-1; i++) obj = obj[keys[i]];
+            obj[keys[keys.length-1]].splice(index, 1);
+            
+            renderForm();
+            renderJsonPreview();
+        }
+
+        function updateArrayItem(path, index, value) {
+            const keys = path.split('.');
+            let obj = appData.prompt;
+            for(let i=0; i<keys.length-1; i++) obj = obj[keys[i]];
+            obj[keys[keys.length-1]][index] = value;
+            
+            renderJsonPreview();
+        }
+
+        // --- Render Functions ---
+
+        function renderJsonPreview() {
+            // Clean up JSON before rendering (remove empty keys conditionally if needed, 
+            // but for this app we usually show structure. However, to make it cleaner, 
+            // we can filter out empty Outdoor fields if Indoor is selected and vice versa)
+            
+            const exportData = JSON.parse(JSON.stringify(appData)); // Deep copy
+            
+            // Cleanup Environment based on type
+            if (exportData.prompt.environment.type === 'indoor') {
+                delete exportData.prompt.environment.location;
+                delete exportData.prompt.environment.weather;
+                delete exportData.prompt.environment.landscape;
+            } else {
+                delete exportData.prompt.environment.room;
+                delete exportData.prompt.environment.furniture;
+                delete exportData.prompt.environment.indoor_objects;
+            }
+
+            const jsonStr = JSON.stringify(exportData, null, 2);
+            document.getElementById('jsonSize').innerText = (jsonStr.length / 1024).toFixed(2) + " KB";
+
+            const container = document.getElementById('jsonOutput');
+            container.innerHTML = ''; // Clear
+
+            const lines = jsonStr.split('\n');
+            lines.forEach(line => {
+                const div = document.createElement('div');
+                div.className = "hover:bg-slate-800/50 -mx-4 px-4 whitespace-pre-wrap break-all";
+                
+                if (line.includes('":')) {
+                    const parts = line.split('":');
+                    const keyPart = parts[0] + '":';
+                    const valPart = parts.slice(1).join('":');
+                    
+                    let valColor = 'text-slate-300';
+                    if (valPart.includes('"')) valColor = 'text-green-400';
+                    else if (valPart.includes('true') || valPart.includes('false')) valColor = 'text-orange-400';
+                    else if (valPart.trim().match(/^[0-9]+$/)) valColor = 'text-orange-400';
+
+                    div.innerHTML = `<span class="text-sky-400">${keyPart}</span><span class="${valColor}">${valPart}</span>`;
+                } else {
+                    let color = 'text-slate-300';
+                    if (line.includes('"')) color = 'text-green-400';
+                    else if (line.includes('[') || line.includes(']') || line.includes('{') || line.includes('}')) color = 'text-slate-500';
+                    
+                    div.className += ` ${color}`;
+                    div.innerText = line;
+                }
+                container.appendChild(div);
+            });
+        }
+
+        function createInputGroup(label, path, multiline = false, placeholder = "") {
+            const value = getValue(path) || "";
+            const wrapper = document.createElement('div');
+            wrapper.className = "mb-4";
+            
+            const labelEl = document.createElement('label');
+            labelEl.className = "block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5";
+            labelEl.innerText = label;
+            
+            let inputEl;
+            if (multiline) {
+                inputEl = document.createElement('textarea');
+                inputEl.className = "w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none resize-none h-20 placeholder-slate-600 transition-all focus:border-indigo-500";
+            } else {
+                inputEl = document.createElement('input');
+                inputEl.type = "text";
+                inputEl.className = "w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none placeholder-slate-600 transition-all focus:border-indigo-500";
+            }
+            
+            inputEl.value = value;
+            inputEl.placeholder = placeholder;
+            inputEl.oninput = (e) => handleInputChange(path, e.target);
+            
+            wrapper.appendChild(labelEl);
+            wrapper.appendChild(inputEl);
+            return wrapper;
+        }
+
+        function createArrayGroup(label, path) {
+            const items = getValue(path) || [];
+            const wrapper = document.createElement('div');
+            wrapper.className = "mb-6";
+
+            const header = document.createElement('div');
+            header.className = "flex justify-between items-center mb-2";
+            header.innerHTML = `
+                <label class="text-xs font-semibold text-slate-400 uppercase tracking-wide">${label}</label>
+                <button onclick="addArrayItem('${path}')" class="text-xs flex items-center text-indigo-400 hover:text-indigo-300 transition-colors">
+                    <i data-lucide="plus" class="w-3 h-3 mr-1"></i> Ekle
+                </button>
+            `;
+            wrapper.appendChild(header);
+
+            const list = document.createElement('div');
+            list.className = "space-y-2";
+            
+            if (items.length === 0) {
+                list.innerHTML = '<div class="text-xs text-slate-600 italic p-2 border border-dashed border-slate-700 rounded text-center">Liste boş</div>';
+            } else {
+                items.forEach((item, index) => {
+                    const row = document.createElement('div');
+                    row.className = "flex gap-2";
+                    
+                    const input = document.createElement('input');
+                    input.type = "text";
+                    input.value = item;
+                    input.className = "flex-1 bg-slate-900 border border-slate-600 rounded-lg p-2 text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none";
+                    input.oninput = (e) => updateArrayItem(path, index, e.target.value);
+
+                    const delBtn = document.createElement('button');
+                    delBtn.className = "p-2 text-red-400 hover:bg-slate-700 rounded-lg transition-colors";
+                    delBtn.innerHTML = `<i data-lucide="trash-2" class="w-4 h-4"></i>`;
+                    delBtn.onclick = () => removeArrayItem(path, index);
+
+                    row.appendChild(input);
+                    row.appendChild(delBtn);
+                    list.appendChild(row);
+                });
+            }
+            wrapper.appendChild(list);
+            return wrapper;
+        }
+
+        function renderForm() {
+            const container = document.getElementById('formContainer');
+            container.innerHTML = ''; 
+
+            const content = document.createElement('div');
+            content.className = "animate-in fade-in slide-in-from-bottom-2 duration-300";
+
+            if (activeTab === 'character') {
+                const section1 = document.createElement('div');
+                section1.className = "p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-xl mb-6 space-y-4";
+                
+                const demoGrid = document.createElement('div');
+                demoGrid.className = "grid grid-cols-2 gap-4";
+                demoGrid.appendChild(createInputGroup("Yaş (Age)", "age", false, "Örn: 24"));
+                demoGrid.appendChild(createInputGroup("Cinsiyet (Gender)", "gender", false, "Örn: Male"));
+                section1.appendChild(demoGrid);
+
+                section1.appendChild(createInputGroup("Ana Konu (Subject)", "subject", true, "Örn: Young man taking a mirror selfie."));
+                section1.appendChild(createInputGroup("Saç (Hair)", "hair", false, "Örn: Short, black hair left slightly messy."));
+                section1.appendChild(createInputGroup("Yüz (Face)", "face", false, "Örn: Zero makeup, neutral expression."));
+                content.appendChild(section1);
+
+                // Glasses Section
+                const glassesHeader = document.createElement('div');
+                glassesHeader.className = "flex items-center justify-between mb-4 border-t border-slate-700 pt-6";
+                glassesHeader.innerHTML = `
+                     <h3 class="text-sm font-bold text-slate-300 flex items-center">
+                        <i data-lucide="eye" class="w-4 h-4 mr-2 text-indigo-400"></i> Gözlük Detayları
+                    </h3>
+                `;
+                
+                const label = document.createElement('label');
+                label.className = "relative inline-flex items-center cursor-pointer";
+                const checkbox = document.createElement('input');
+                checkbox.type = "checkbox";
+                checkbox.className = "sr-only peer";
+                checkbox.checked = appData.prompt.glasses.worn;
+                checkbox.onchange = toggleGlasses;
+                
+                const slider = document.createElement('div');
+                slider.className = "w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600";
+                
+                label.appendChild(checkbox);
+                label.appendChild(slider);
+                glassesHeader.appendChild(label);
+                content.appendChild(glassesHeader);
+
+                if (appData.prompt.glasses.worn) {
+                    const glassesContent = document.createElement('div');
+                    glassesContent.className = "pl-4 border-l-2 border-indigo-500/30 space-y-4 mb-6";
+                    glassesContent.appendChild(createInputGroup("Genel Açıklama", "glasses.description", false, "Örn: Black rectangular wireframe glasses."));
+                    
+                    const grid = document.createElement('div');
+                    grid.className = "grid grid-cols-2 gap-4";
+                    grid.appendChild(createInputGroup("Çerçeve Şekli", "glasses.details.frame_shape", false, "rectangular"));
+                    grid.appendChild(createInputGroup("Çerçeve Rengi", "glasses.details.frame_color", false, "matte black"));
+                    grid.appendChild(createInputGroup("Materyal", "glasses.details.frame_material", false, "thin metal"));
+                    grid.appendChild(createInputGroup("Lens Tipi", "glasses.details.lens_type", false, "clear transparent"));
+                    
+                    // Eksik olan Style alanı eklendi ve tam satır yapıldı
+                    const styleInput = createInputGroup("Stil (Style)", "glasses.details.style", false, "minimalist modern");
+                    styleInput.className = "mb-4 col-span-2"; 
+                    grid.appendChild(styleInput);
+                    
+                    glassesContent.appendChild(grid);
+                    content.appendChild(glassesContent);
+                }
+
+                const accSection = document.createElement('div');
+                accSection.className = "border-t border-slate-700 pt-6";
+                accSection.appendChild(createArrayGroup("Aksesuarlar", "accessories"));
+                content.appendChild(accSection);
+            }
+            else if (activeTab === 'clothing') {
+                const section = document.createElement('div');
+                section.className = "p-4 bg-slate-900/50 rounded-xl border border-slate-700 space-y-4";
+                section.appendChild(createInputGroup("Genel Tarz", "clothing.general", true, "Örn: Comfortable and casual outfit."));
+                
+                const grid = document.createElement('div');
+                grid.className = "grid grid-cols-1 md:grid-cols-2 gap-4 mt-4";
+                grid.appendChild(createInputGroup("Üst Giyim", "clothing.top", false, "Örn: Black, plain t-shirt."));
+                grid.appendChild(createInputGroup("Alt Giyim", "clothing.bottom", false, "Örn: Regular waist, dark blue jeans."));
+                section.appendChild(grid);
+                
+                content.appendChild(section);
+            }
+            else if (activeTab === 'environment') {
+                 const section = document.createElement('div');
+                 section.className = "space-y-6";
+
+                 // Environment Type Switcher
+                 const typeSwitcher = document.createElement('div');
+                 typeSwitcher.className = "flex bg-slate-900 p-1 rounded-lg border border-slate-700 mb-6";
+                 
+                 const btnIndoor = document.createElement('button');
+                 const isIndoor = appData.prompt.environment.type === 'indoor';
+                 btnIndoor.className = `flex-1 py-2 text-sm font-medium rounded-md transition-all ${isIndoor ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`;
+                 btnIndoor.innerText = "İç Mekan (Indoor)";
+                 btnIndoor.onclick = () => setEnvironmentType('indoor');
+
+                 const btnOutdoor = document.createElement('button');
+                 const isOutdoor = appData.prompt.environment.type === 'outdoor';
+                 btnOutdoor.className = `flex-1 py-2 text-sm font-medium rounded-md transition-all ${isOutdoor ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`;
+                 btnOutdoor.innerText = "Dış Mekan (Outdoor)";
+                 btnOutdoor.onclick = () => setEnvironmentType('outdoor');
+
+                 typeSwitcher.appendChild(btnIndoor);
+                 typeSwitcher.appendChild(btnOutdoor);
+                 section.appendChild(typeSwitcher);
+                 
+                 // Conditional Fields
+                 if (isIndoor) {
+                     const indoorBox = document.createElement('div');
+                     indoorBox.className = "space-y-4 animate-in fade-in zoom-in duration-300";
+                     indoorBox.appendChild(createInputGroup("Oda / Mekan Tipi", "environment.room", false, "Örn: Light-colored studio apartment."));
+                     
+                     const grid = document.createElement('div');
+                     grid.className = "grid grid-cols-1 md:grid-cols-2 gap-4";
+                     grid.appendChild(createInputGroup("Mobilya", "environment.furniture", false, "Örn: Simple single bed with white bedding."));
+                     grid.appendChild(createInputGroup("Diğer Objeler", "environment.indoor_objects", false, "Örn: Black woven leather bag on bed."));
+                     indoorBox.appendChild(grid);
+                     
+                     section.appendChild(indoorBox);
+                 } else {
+                     const outdoorBox = document.createElement('div');
+                     outdoorBox.className = "space-y-4 animate-in fade-in zoom-in duration-300";
+                     outdoorBox.appendChild(createInputGroup("Konum (Location)", "environment.location", false, "Örn: Busy city street, Park, Forest..."));
+                     
+                     const grid = document.createElement('div');
+                     grid.className = "grid grid-cols-1 md:grid-cols-2 gap-4";
+                     grid.appendChild(createInputGroup("Hava Durumu / Zaman", "environment.weather", false, "Örn: Sunny day, Rainy night, Golden hour..."));
+                     grid.appendChild(createInputGroup("Peyzaj / Çevre", "environment.landscape", false, "Örn: Tall skyscrapers, Green trees, Mountains..."));
+                     outdoorBox.appendChild(grid);
+                     
+                     section.appendChild(outdoorBox);
+                 }
+
+                 section.appendChild(createInputGroup("İnce Detaylar & Atmosfer", "environment.details", true, "Örn: Minimalist decor, Foggy atmosphere..."));
+                 content.appendChild(section);
+            }
+            else if (activeTab === 'tech') {
+                const techBox = document.createElement('div');
+                techBox.className = "p-4 bg-amber-500/5 border border-amber-500/10 rounded-xl space-y-4 mb-6";
+                
+                const title = document.createElement('h3');
+                title.className = "text-xs font-bold text-amber-500 uppercase mb-4";
+                title.innerText = "Teknik Ayarlar";
+                techBox.appendChild(title);
+                techBox.appendChild(createInputGroup("Aydınlatma", "lighting", false, "Örn: Soft, bright, natural indoor lighting."));
+                
+                const grid = document.createElement('div');
+                grid.className = "grid grid-cols-2 gap-4 mt-4";
+                grid.appendChild(createInputGroup("Perspektif", "camera.perspective", false, "Örn: Mirror selfie taken with phone."));
+                grid.appendChild(createInputGroup("Kamera Açısı", "camera.angle", false, "Örn: Medium close-up."));
+                techBox.appendChild(grid);
+                content.appendChild(techBox);
+
+                const styleSection = document.createElement('div');
+                styleSection.className = "border-t border-slate-700 pt-6";
+                styleSection.appendChild(createArrayGroup("Stil Etiketleri", "style"));
+                content.appendChild(styleSection);
+
+                 const detailSection = document.createElement('div');
+                detailSection.className = "border-t border-slate-700 pt-6";
+                detailSection.appendChild(createInputGroup("Ekstra Detaylar", "additional_details", true, "Örn: Holding a green cold drink with a straw."));
+                content.appendChild(detailSection);
+            }
+
+            container.appendChild(content);
+            lucide.createIcons();
+        }
+
+        function switchTab(tabId) {
+            activeTab = tabId;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                const isActive = btn.dataset.tab === tabId;
+                if(isActive) {
+                    btn.className = "tab-btn active flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-1 justify-center bg-indigo-600 text-white shadow-md";
+                } else {
+                    btn.className = "tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-1 justify-center text-slate-400 hover:bg-slate-700/50 hover:text-slate-200";
+                }
+            });
+            renderForm();
+        }
+
+        function copyJson() {
+            // Need to generate clean JSON for copy as well
+            const exportData = JSON.parse(JSON.stringify(appData));
+            if (exportData.prompt.environment.type === 'indoor') {
+                delete exportData.prompt.environment.location;
+                delete exportData.prompt.environment.weather;
+                delete exportData.prompt.environment.landscape;
+            } else {
+                delete exportData.prompt.environment.room;
+                delete exportData.prompt.environment.furniture;
+                delete exportData.prompt.environment.indoor_objects;
+            }
+            
+            const jsonStr = JSON.stringify(exportData, null, 2);
+            navigator.clipboard.writeText(jsonStr).then(() => {
+                const btn = document.getElementById('copyBtn');
+                const span = document.getElementById('copyText');
+                
+                btn.className = "flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-green-600/20 text-green-400 border border-green-500/50";
+                span.innerText = "Kopyalandı";
+                
+                setTimeout(() => {
+                    btn.className = "flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20";
+                    span.innerText = "JSON Kopyala";
+                }, 2000);
+            });
+        }
+
+        window.onload = () => {
+            renderForm();
+            renderJsonPreview();
+            lucide.createIcons();
+        };
+
+    </script>
+</body>
+</html>
