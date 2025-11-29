@@ -105,9 +105,12 @@
 
     <!-- JavaScript Logic -->
     <script>
-        // --- Initial State (Empty Values for Placeholders) ---
+        // --- Initial State ---
         let appData = {
             prompt: {
+                _ref_mode: "instruction", // internal state: 'instruction' or 'path'
+                instructions: "Use the attached image as a visual reference.", 
+                reference_image: "",
                 subject: "",
                 age: "",
                 gender: "",
@@ -131,14 +134,11 @@
                 },
                 accessories: [],
                 environment: {
-                    type: "indoor", // Default type
-                    // Common fields
+                    type: "indoor",
                     details: "",
-                    // Indoor fields
                     room: "",
                     furniture: "",
                     indoor_objects: "",
-                    // Outdoor fields (initially empty)
                     location: "",
                     weather: "",
                     landscape: ""
@@ -157,12 +157,10 @@
 
         // --- Core Functions ---
 
-        // Gets nested value from string path "prompt.clothing.top"
         function getValue(path) {
             return path.split('.').reduce((acc, part) => acc && acc[part], appData.prompt);
         }
 
-        // Sets nested value
         function setValue(path, value) {
             const keys = path.split('.');
             let current = appData.prompt;
@@ -173,32 +171,34 @@
             renderJsonPreview();
         }
 
-        // Input Change Handler
         function handleInputChange(path, element) {
             setValue(path, element.value);
         }
 
-        // Toggle Glasses
         function toggleGlasses() {
             appData.prompt.glasses.worn = !appData.prompt.glasses.worn;
             renderForm();
             renderJsonPreview();
         }
         
-        // Toggle Environment Type
         function setEnvironmentType(type) {
             appData.prompt.environment.type = type;
             renderForm();
             renderJsonPreview();
         }
 
-        // Array Operations
+        // --- YENİ FONKSİYON: Referans Modu Değiştirici ---
+        function setRefMode(mode) {
+            appData.prompt._ref_mode = mode;
+            renderForm();
+            renderJsonPreview();
+        }
+
         function addArrayItem(path) {
             const keys = path.split('.');
             let obj = appData.prompt;
             for(let i=0; i<keys.length-1; i++) obj = obj[keys[i]];
             obj[keys[keys.length-1]].push("");
-            
             renderForm(); 
             renderJsonPreview();
         }
@@ -208,7 +208,6 @@
             let obj = appData.prompt;
             for(let i=0; i<keys.length-1; i++) obj = obj[keys[i]];
             obj[keys[keys.length-1]].splice(index, 1);
-            
             renderForm();
             renderJsonPreview();
         }
@@ -218,20 +217,17 @@
             let obj = appData.prompt;
             for(let i=0; i<keys.length-1; i++) obj = obj[keys[i]];
             obj[keys[keys.length-1]][index] = value;
-            
             renderJsonPreview();
         }
 
         // --- Render Functions ---
 
         function renderJsonPreview() {
-            // Clean up JSON before rendering (remove empty keys conditionally if needed, 
-            // but for this app we usually show structure. However, to make it cleaner, 
-            // we can filter out empty Outdoor fields if Indoor is selected and vice versa)
+            const exportData = JSON.parse(JSON.stringify(appData));
             
-            const exportData = JSON.parse(JSON.stringify(appData)); // Deep copy
+            // --- TEMİZLİK MANTIĞI ---
             
-            // Cleanup Environment based on type
+            // 1. Ortam temizliği
             if (exportData.prompt.environment.type === 'indoor') {
                 delete exportData.prompt.environment.location;
                 delete exportData.prompt.environment.weather;
@@ -242,11 +238,21 @@
                 delete exportData.prompt.environment.indoor_objects;
             }
 
+            // 2. Referans Modu Temizliği (YENİ)
+            const refMode = exportData.prompt._ref_mode;
+            delete exportData.prompt._ref_mode; // Internal key'i sil
+
+            if (refMode === 'instruction') {
+                delete exportData.prompt.reference_image; // Chat modundaysa path'i sil
+            } else {
+                delete exportData.prompt.instructions; // Path modundaysa talimatı sil
+            }
+
             const jsonStr = JSON.stringify(exportData, null, 2);
             document.getElementById('jsonSize').innerText = (jsonStr.length / 1024).toFixed(2) + " KB";
 
             const container = document.getElementById('jsonOutput');
-            container.innerHTML = ''; // Clear
+            container.innerHTML = '';
 
             const lines = jsonStr.split('\n');
             lines.forEach(line => {
@@ -268,7 +274,6 @@
                     let color = 'text-slate-300';
                     if (line.includes('"')) color = 'text-green-400';
                     else if (line.includes('[') || line.includes(']') || line.includes('{') || line.includes('}')) color = 'text-slate-500';
-                    
                     div.className += ` ${color}`;
                     div.innerText = line;
                 }
@@ -408,7 +413,6 @@
                     grid.appendChild(createInputGroup("Materyal", "glasses.details.frame_material", false, "thin metal"));
                     grid.appendChild(createInputGroup("Lens Tipi", "glasses.details.lens_type", false, "clear transparent"));
                     
-                    // Eksik olan Style alanı eklendi ve tam satır yapıldı
                     const styleInput = createInputGroup("Stil (Style)", "glasses.details.style", false, "minimalist modern");
                     styleInput.className = "mb-4 col-span-2"; 
                     grid.appendChild(styleInput);
@@ -439,7 +443,6 @@
                  const section = document.createElement('div');
                  section.className = "space-y-6";
 
-                 // Environment Type Switcher
                  const typeSwitcher = document.createElement('div');
                  typeSwitcher.className = "flex bg-slate-900 p-1 rounded-lg border border-slate-700 mb-6";
                  
@@ -459,7 +462,6 @@
                  typeSwitcher.appendChild(btnOutdoor);
                  section.appendChild(typeSwitcher);
                  
-                 // Conditional Fields
                  if (isIndoor) {
                      const indoorBox = document.createElement('div');
                      indoorBox.className = "space-y-4 animate-in fade-in zoom-in duration-300";
@@ -495,8 +497,50 @@
                 
                 const title = document.createElement('h3');
                 title.className = "text-xs font-bold text-amber-500 uppercase mb-4";
-                title.innerText = "Teknik Ayarlar";
+                title.innerText = "Referans Modu Seçimi";
                 techBox.appendChild(title);
+                
+                // --- MOD SEÇİCİ ---
+                const modeSwitcher = document.createElement('div');
+                modeSwitcher.className = "flex bg-slate-900 p-1 rounded-lg border border-slate-700 mb-6";
+                
+                const btnInst = document.createElement('button');
+                const isInst = appData.prompt._ref_mode === 'instruction';
+                btnInst.className = `flex-1 py-2 text-xs font-medium rounded-md transition-all ${isInst ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`;
+                btnInst.innerHTML = '<i data-lucide="message-square" class="w-3 h-3 inline mr-1"></i> Chat / AI Talimatı';
+                btnInst.onclick = () => setRefMode('instruction');
+
+                const btnPath = document.createElement('button');
+                const isPath = appData.prompt._ref_mode === 'path';
+                btnPath.className = `flex-1 py-2 text-xs font-medium rounded-md transition-all ${isPath ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`;
+                btnPath.innerHTML = '<i data-lucide="link" class="w-3 h-3 inline mr-1"></i> Dosya Yolu';
+                btnPath.onclick = () => setRefMode('path');
+
+                modeSwitcher.appendChild(btnInst);
+                modeSwitcher.appendChild(btnPath);
+                techBox.appendChild(modeSwitcher);
+                
+                // --- CONDITIONAL INPUTS ---
+                if (isPath) {
+                    const refGroup = createInputGroup("Referans Görsel (Dosya Yolu / URL)", "reference_image", false, "Örn: ./ref/pose_01.png veya https://imgy.com/ref.jpg");
+                    refGroup.querySelector('input').className += " border-amber-500/30 focus:border-amber-500";
+                    techBox.appendChild(refGroup);
+                } else {
+                    const instGroup = createInputGroup("Chat / AI Talimatı", "instructions", false, "Görseli nasıl kullanması gerektiğini belirtin.");
+                    instGroup.querySelector('input').className += " text-amber-400";
+                    techBox.appendChild(instGroup);
+                    
+                    const helper = document.createElement('p');
+                    helper.className = "text-[11px] text-slate-500 -mt-3 mb-4 italic px-1";
+                    helper.innerText = "Not: Chat'e önce görseli yükleyin, ardından modelin bu görseli tanıması için yukarıdaki talimatı ve JSON'u gönderin.";
+                    techBox.appendChild(helper);
+                }
+
+                const techSettingsTitle = document.createElement('h3');
+                techSettingsTitle.className = "text-xs font-bold text-amber-500 uppercase mb-4 mt-6 pt-4 border-t border-amber-500/20";
+                techSettingsTitle.innerText = "Teknik Ayarlar";
+                techBox.appendChild(techSettingsTitle);
+
                 techBox.appendChild(createInputGroup("Aydınlatma", "lighting", false, "Örn: Soft, bright, natural indoor lighting."));
                 
                 const grid = document.createElement('div');
@@ -535,8 +579,9 @@
         }
 
         function copyJson() {
-            // Need to generate clean JSON for copy as well
             const exportData = JSON.parse(JSON.stringify(appData));
+            
+            // Clean environment
             if (exportData.prompt.environment.type === 'indoor') {
                 delete exportData.prompt.environment.location;
                 delete exportData.prompt.environment.weather;
@@ -547,6 +592,16 @@
                 delete exportData.prompt.environment.indoor_objects;
             }
             
+            // Clean Ref Mode
+            const refMode = exportData.prompt._ref_mode;
+            delete exportData.prompt._ref_mode; 
+
+            if (refMode === 'instruction') {
+                delete exportData.prompt.reference_image;
+            } else {
+                delete exportData.prompt.instructions; 
+            }
+
             const jsonStr = JSON.stringify(exportData, null, 2);
             navigator.clipboard.writeText(jsonStr).then(() => {
                 const btn = document.getElementById('copyBtn');
