@@ -1,2 +1,2 @@
 # JSON Prompt Maker
-[](webpage.png)
+![image](assets/webpage.png)
